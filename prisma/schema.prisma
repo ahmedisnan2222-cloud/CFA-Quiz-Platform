@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+enum Confidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(STUDENT)
+  createdAt    DateTime @default(now())
+
+  quizzesCreated Quiz[]    @relation("QuizCreatedBy")
+  attempts       Attempt[]
+}
+
+model Quiz {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  opensAt         DateTime
+  closesAt        DateTime
+  durationMinutes Int
+  createdAt       DateTime @default(now())
+
+  createdById String
+  createdBy   User   @relation("QuizCreatedBy", fields: [createdById], references: [id])
+
+  questions Question[]
+  attempts  Attempt[]
+}
+
+model Question {
+  id           String @id @default(cuid())
+  quizId       String
+  quiz         Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  text         String
+  options      Json // [{ label: "A", text: "..." }, ...]
+  correctLabel String
+  order        Int
+
+  attemptAnswers AttemptAnswer[]
+
+  @@index([quizId])
+}
+
+model Attempt {
+  id          String    @id @default(cuid())
+  quizId      String
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  score       Int?
+
+  answers AttemptAnswer[]
+
+  @@index([quizId, userId])
+}
+
+model AttemptAnswer {
+  id            String     @id @default(cuid())
+  attemptId     String
+  attempt       Attempt    @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      Question   @relation(fields: [questionId], references: [id])
+  selectedLabel String
+  confidence    Confidence
+  isCorrect     Boolean
+
+  @@unique([attemptId, questionId])
+}
