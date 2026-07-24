@@ -118,6 +118,75 @@ confirming.
 - **Railway** — good developer experience but no longer has a long-term free
   tier (trial credit only); treat as a paid fallback.
 
+## Deploying on your own VPS
+
+If you already have a server (DigitalOcean, AWS EC2, etc.) with SSH access,
+you can run this directly instead of using Vercel/Neon.
+
+1. **Install prerequisites** (Ubuntu/Debian example):
+
+   ```bash
+   curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+   sudo apt-get install -y nodejs postgresql nginx
+   sudo npm install -g pm2
+   ```
+
+2. **Set up Postgres** (or point `DATABASE_URL` at a managed Postgres instead
+   — Neon's free tier works fine from a VPS too):
+
+   ```bash
+   sudo -u postgres psql -c "CREATE DATABASE quizdb;"
+   sudo -u postgres psql -c "CREATE USER quizapp WITH ENCRYPTED PASSWORD 'pick-a-password';"
+   sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE quizdb TO quizapp;"
+   ```
+
+3. **Get the code onto the server** (unzip the project, or `git clone` if
+   it's pushed to GitHub), then:
+
+   ```bash
+   cd cfa-quiz-platform
+   cp .env.example .env
+   # edit .env: DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL (your real domain),
+   # ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME
+   npm install
+   npx prisma migrate deploy
+   npx prisma generate
+   npm run seed:admin
+   npm run build
+   ```
+
+4. **Run it under pm2** so it survives reboots/crashes:
+
+   ```bash
+   pm2 start npm --name cfa-quiz -- start
+   pm2 save
+   pm2 startup   # follow the printed instructions to enable on boot
+   ```
+
+   By default this serves on `http://localhost:3000` on the server itself.
+
+5. **Expose it publicly with nginx as a reverse proxy**, then use
+   [certbot](https://certbot.eff.org/) for a free SSL certificate so it's
+   served over `https://`. A minimal nginx server block:
+
+   ```nginx
+   server {
+       listen 80;
+       server_name quiz.yourdomain.com;
+
+       location / {
+           proxy_pass http://localhost:3000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+       }
+   }
+   ```
+
+   Then: `sudo certbot --nginx -d quiz.yourdomain.com`.
+
+Once deployed, `NEXTAUTH_URL` in `.env` must match the real public URL
+(`https://quiz.yourdomain.com`), or logins will fail.
+
 ## Notes
 
 - Students can retake quizzes; every attempt is stored, and the admin report
