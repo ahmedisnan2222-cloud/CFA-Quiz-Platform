@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed:admin": "tsx -r dotenv/config scripts/seed-admin.ts",
+    "reset-password": "tsx -r dotenv/config scripts/reset-password.ts",
     "test": "vitest run"
   },
   "dependencies": {
